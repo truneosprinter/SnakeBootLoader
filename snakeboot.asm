@@ -19,6 +19,11 @@ right_arrow = 0x4d                ; Scan code for right arrow key
 down_arrow = 0x50                 ; Scan code for down arrow key
 up_arrow = 0x48                   ; Scan code for up arrow key
     
+call clear_screen                 ; Clears 
+
+mov bx, hello_msg
+call print_string
+
 call handle_food                  ; Initialize and draw the food position
 
 start:                            ; Start of main loop
@@ -84,6 +89,36 @@ jmp start                         ; Jump back to start
 failure:
 jmp $                             ; Infinite loop (do nothing)
 
+clear_screen:                     ; Subroutine to clear the screen
+mov ah, 0x02                      ; Set cursor position funciton
+mov bh, 0                         ; Page number (0)
+mov dh, 0                         ; Set row to 0 (start at top-left)
+mov dl, 0                         ; Set column to 0 (start at top-left part 2)
+int video                         ; Call BIOS video interrupt to set cursor position
+
+mov ah, write_char                ; Set write charachter function
+mov bh, 0                         ; Page number (0)
+mov al, ' '                       ; Charachter to write (space, to clear screen)
+mov cx, 2000                      ; Number of times to write charachter (80 columns * 25 rows)
+int video                         ; Call BIOS video interrupt to write charachter
+ret                               ; Return from subroutine
+
+print_char:
+mov ah, 0xe
+int 0x10
+ret
+
+print_string:
+mov ax, [bx]
+cmp al, 0
+je exit
+call print_char
+add bx, 1
+jmp print_string
+
+exit:
+ret
+
 handle_keyboard:                  ; Subroutine to handle keyboard input
 mov ah, keystroke_status          ; Set keystroke status function
 int keyboard_int                  ; Call BIOS keyboard interrupt
@@ -132,6 +167,9 @@ scan_code:
 db left_arrow                     ; Initial scan code (left arrow)
 food_pos:
 db 15                             ; Initial food position
+hello_msg:
+db ' Snake Boot', 0
+
 
 times 510 - ($ - $$) db 0         ; Fill remaining bytes with zeros until 510 bytes total
 dw 0xAA55                         ; Boot sector signature (0xAA55)
