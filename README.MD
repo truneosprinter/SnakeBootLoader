@@ -14,4 +14,4 @@ fasm snakeboot.asm
 qemu-system-x86_64 snakeboot.bin
 ```
 
-To anyone who tries it out, I hope you enjoy
+To anyone who tries it out, I hope you enjoy!
