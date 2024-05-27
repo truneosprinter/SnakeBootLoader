@@ -48,9 +48,16 @@ jne regular_flow                  ; If not equal, continue normal flow
 mov al, [food_col]                ; Load food column position into AL
 cmp [pos_col], al                 ; Compare column position with food column position
 jne regular_flow                  ; If not equal, continue normal flow
-call handle_food                  ; If equal, handle new food position
+
+inc byte [score]                  ; Increment the score
+call display_score                ; Display the updated score
+call handle_food                  ; Handle new food position
+
+cmp byte [score], 255             ; Check if the score is 255
+je you_win                        ; If it is, jump to the you_win label
 
 regular_flow:                     ; Normal execution flow
+
 
 mov ah, set_cursor_pos            ; Set cursor position function
 mov dh, [pos_row]                 ; Load row position into DH
@@ -121,17 +128,21 @@ int video                         ; Call BIOS video interrupt to write character
 ret                               ; Return from subroutine
 
 print_char:
-mov ah, 0xe
-int 0x10
+mov ah, 0x0e                  ; Teletype function
+int video                     ; BIOS video interrupt
 ret
 
 print_string:
-mov ax, [bx]
+mov al, [bx]
 cmp al, 0
 je exit
 call print_char
-add bx, 1
+inc bx                        ; Use inc bx instead of add bx, 1
 jmp print_string
+
+you_win:
+call display_score                ; Display the score (which will show "You Win")
+jmp $                             ; Infinite loop to halt the game
 
 exit:
 ret
@@ -149,44 +160,110 @@ end_of_handle_keyboard:
 ret                               ; Return from subroutine
 
 handle_food:                      ; Subroutine to handle food placement
-    mov ah, read_time_counter     ; Set read time counter function
-    int timer_int                 ; Call BIOS timer interrupt
-    mov al, dl                    ; Copy timer low byte to AL
+mov ah, read_time_counter     ; Set read time counter function
+int timer_int                 ; Call BIOS timer interrupt
+mov al, dl                    ; Copy timer low byte to AL
 
-    ; Calculate row position for food
-    xor ah, ah                    ; Clear AH
-    mov cl, screen_height-4       ; Set CL to screen height - 4
-    div cl                        ; Divide AX by screen height - 4
-    add ah, 2                     ; Ensure it's within boundary (2 to screen_height - 3)
-    mov [food_row], ah            ; Store result in food_row
+; Calculate row position for food
+xor ah, ah                    ; Clear AH
+mov cl, screen_height-4       ; Set CL to screen height - 4
+div cl                        ; Divide AX by screen height - 4
+add ah, 2                     ; Ensure it's within boundary (2 to screen_height - 3)
+mov [food_row], ah            ; Store result in food_row
 
-    ; Calculate column position for food
-    mov al, dl                    ; Copy timer low byte to AL
-    xor ah, ah                    ; Clear AH
-    mov cl, screen_width-4        ; Set CL to screen width - 4
-    div cl                        ; Divide AX by screen width - 4
-    add ah, 2                     ; Ensure it's within boundary (2 to screen_width - 3)
-    mov [food_col], ah            ; Store result in food_col
+; Calculate column position for food
+mov al, dl                    ; Copy timer low byte to AL
+xor ah, ah                    ; Clear AH
+mov cl, screen_width-4        ; Set CL to screen width - 4
+div cl                        ; Divide AX by screen width - 4
+add ah, 2                     ; Ensure it's within boundary (2 to screen_width - 3)
+mov [food_col], ah            ; Store result in food_col
 
-    mov ah, set_cursor_pos        ; Set cursor position function
-    mov dh, [food_row]            ; Load food row position into DH
-    mov dl, [food_col]            ; Load food column position into DL
-    mov bh, 0                     ; Page number (0)
-    int video                     ; Call BIOS video interrupt to set cursor position
+mov ah, set_cursor_pos        ; Set cursor position function
+mov dh, [food_row]            ; Load food row position into DH
+mov dl, [food_col]            ; Load food column position into DL
+mov bh, 0                     ; Page number (0)
+int video                     ; Call BIOS video interrupt to set cursor position
 
-    mov ah, write_char            ; Set write character function
-    mov bh, 0                     ; Page number (0)
-    mov cx, 1                     ; Number of times to write character (1)
-    mov al, '&'                   ; Character to write (ampersand, to represent food)
-    int video                     ; Call BIOS video interrupt to write character
+mov ah, write_char            ; Set write character function
+mov bh, 0                     ; Page number (0)
+mov cx, 1                     ; Number of times to write character (1)
+mov al, '&'                   ; Character to write (ampersand, to represent food)
+int video                     ; Call BIOS video interrupt to write character
 
-    mov ah, set_cursor_pos        ; Set cursor position function
-    mov dh, 0                     ; Set row to 0 (return cursor to top-left)
-    mov dl, 0                     ; Set column to 0 (return cursor to top-left)
-    mov bh, 0                     ; Page number (0)
-    int video                     ; Call BIOS video interrupt to set cursor position
+mov ah, set_cursor_pos        ; Set cursor position function
+mov dh, 0                     ; Set row to 0 (return cursor to top-left)
+mov dl, 0                     ; Set column to 0 (return cursor to top-left)
+mov bh, 0                     ; Page number (0)
+int video                     ; Call BIOS video interrupt to set cursor position
 
-    ret                           ; Return from subroutine
+ret                           ; Return from subroutine
+
+display_score:
+pusha                             ; Save all registers
+
+; Set cursor position for the score display (e.g., top-right corner)
+mov ah, set_cursor_pos
+mov dh, 0                         ; Row 0 (top)
+mov dl, screen_width - 15         ; Column (near the right edge, adjust as needed)
+mov bh, 0                         ; Page number (0)
+int video                         ; Call BIOS video interrupt to set cursor position
+
+; Display "Score: "
+mov bx, score_msg
+call print_string
+
+; Check if score is 255 to display "You Win"
+mov al, [score]
+cmp al, 255                       ; Compare score with 255
+jne display_actual_score          ; If not 255, display actual score
+
+; Display "You Win" message
+mov bx, you_win_msg
+call print_string
+jmp end_display_score             ; Skip the actual score display
+
+display_actual_score:
+; Display the score value
+mov ax, [score]
+call print_decimal
+
+end_display_score:
+popa                              ; Restore all registers
+ret                               ; Return from subroutine
+
+score_msg:
+db 'Score: ', 0
+
+you_win_msg:
+db 'You Win!', 0
+
+
+print_decimal:
+pusha                             ; Save all registers
+mov cx, 10                        ; Set up divisor for decimal conversion
+xor dx, dx                        ; Clear DX for division
+mov bx, 10d                       ; Set up base 10 divisor
+xor di, di                        ; Clear DI for storing digits
+
+.convert_loop:
+div bx                            ; AX / 10, remainder in DX, quotient in AX
+add dl, '0'                       ; Convert remainder to ASCII
+push dx                           ; Push digit onto stack
+inc di                            ; Increment digit count
+xor dx, dx                        ; Clear DX for next division
+test ax, ax                       ; Check if quotient is zero
+jnz .convert_loop                 ; If not zero, continue
+
+.print_digits:
+pop dx                            ; Pop digit from stack
+mov al, dl                        ; Move digit to AL
+call print_char                   ; Print the digit
+dec di                            ; Decrement digit count
+jnz .print_digits                 ; If more digits, continue
+
+popa                              ; Restore all registers
+ret                               ; Return from subroutine
 
 
 pos_row:
@@ -200,7 +277,9 @@ db 15                             ; Initial food row position
 food_col:
 db 15                             ; Initial food column position
 hello_msg:
-db ' Snake Boot', 0
+db ' Snake Boot', 0               ; Initialize application title
+score:
+db 0                              ; Initialize score to 0
 
 times 510 - ($ - $$) db 0         ; Fill remaining bytes with zeros until 510 bytes total
 dw 0xAA55                         ; Boot sector signature (0xAA55)
