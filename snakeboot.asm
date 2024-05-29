@@ -227,9 +227,11 @@ display_score:
     jmp end_display_score         	; Skip the actual score display
 
 display_actual_score:
-    ; Display the score value
+    ; Display the score value with a fixed width of 8 digits
     mov ax, [score]
+    mov cx, 8                      ; Fixed width for score display
     call print_decimal
+    jmp end_display_score          ; Skip the actual score display
 
 end_display_score:
     popa                          	; Restore all registers
@@ -242,30 +244,39 @@ you_win_msg:
     db 'You Win!', 0
 
 print_decimal:
-    pusha                         	; Save all registers
-    mov cx, 10                    	; Set up divisor for decimal conversion
-    xor dx, dx                    	; Clear DX for division
-    mov bx, 10d                   	; Set up base 10 divisor
-    xor di, di                    	; Clear DI for storing digits
+    pusha                          ; Save all registers
+    mov bx, 10                     ; Set up base 10 divisor
+    xor di, di                     ; Clear DI for storing digits
+    mov si, cx                     ; SI will hold the width parameter
 
     .convert_loop:
-        div bx                    	; AX / 10, remainder in DX, quotient in AX
-        add dl, '0'               	; Convert remainder to ASCII
-        push dx                   	; Push digit onto stack
-        inc di                    	; Increment digit count
-        xor dx, dx                	; Clear DX for next division
-        test ax, ax               	; Check if quotient is zero
-        jnz .convert_loop         	; If not zero, continue
+        xor dx, dx                 ; Clear DX for division
+        div bx                     ; AX / 10, remainder in DX, quotient in AX
+        add dl, '0'                ; Convert remainder to ASCII
+        push dx                    ; Push digit onto stack
+        inc di                     ; Increment digit count
+        test ax, ax                ; Check if quotient is zero
+        jnz .convert_loop          ; If not zero, continue
+
+    ; Ensure leading zeros are printed
+    .print_leading_zeros:
+        cmp di, si                 ; Compare digit count with specified width
+        jge .print_digits          ; If we've printed enough digits, skip to printing digits
+        mov dl, '0'                ; Load ASCII for '0'
+        push dx                    ; Push zero onto stack
+        inc di                     ; Increment digit count
+        jmp .print_leading_zeros   ; Repeat until we've printed enough digits
 
     .print_digits:
-        pop dx                    	; Pop digit from stack
-        mov al, dl                	; Move digit to AL
-        call print_char           	; Print the digit
-        dec di                    	; Decrement digit count
-        jnz .print_digits         	; If more digits, continue
+        pop dx                     ; Pop digit from stack
+        mov al, dl                 ; Move digit to AL
+        call print_char            ; Print the digit
+        dec di                     ; Decrement digit count
+        jnz .print_digits          ; If more digits, continue
 
-    popa                          	; Restore all registers
-    ret                           	; Return from subroutine
+    popa                           ; Restore all registers
+    ret                            ; Return from subroutine
+                        	; Return from subroutine
 
 pos_row:
     db 10                         	; Initial row position for player
